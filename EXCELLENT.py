@@ -17,13 +17,14 @@ init(autoreset=True)
 console = Console()
 
 def clear_screen():
-    # ฟังก์ชันสำหรับล้างหน้าจอ
+    """ฟังก์ชันสำหรับล้างหน้าจอ"""
     if sys.platform.startswith('win'):
         os.system('cls')
     else:
         os.system('clear')
 
 def login(session, base_url, username, password):
+    """ฟังก์ชันสำหรับการเข้าสู่ระบบ"""
     payload = {
         'username': username,
         'password': password
@@ -51,7 +52,17 @@ def login(session, base_url, username, password):
         console.print(f"[bold red]เกิดข้อผิดพลาดระหว่างการเข้าสู่ระบบ: {e}")
         return False
 
+def get_validated_input(prompt_text, default, validation_func, error_message):
+    """ฟังก์ชันสำหรับรับข้อมูลจากผู้ใช้และตรวจสอบความถูกต้อง"""
+    while True:
+        user_input = Prompt.ask(prompt_text, default=default)
+        if validation_func(user_input):
+            return user_input
+        else:
+            console.print(f"[bold red]{error_message}[/bold red]")
+
 def create_code(session, base_url, username, password):
+    """ฟังก์ชันสำหรับสร้างโค้ด VLESS"""
     clear_screen()
     console.print(Panel("""
 [bold cyan]
@@ -70,17 +81,54 @@ def create_code(session, base_url, username, password):
         console.input("[bold green]กด Enter เพื่อกลับสู่เมนูหลัก...")
         return
 
-    console.print("[bold yellow]\nกรุณากรอกข้อมูลสำหรับสร้างโค้ด\n")
-    code_name = Prompt.ask("[bold cyan]📝 ตั้งชื่อโค้ดของคุณ")
-    num_days = int(Prompt.ask("[bold cyan]📅 จำนวนวันที่ต้องการ (1-30)", default="1"))
-    gb_amount = int(Prompt.ask("[bold cyan]💾 จำนวน GB ที่ต้องการ (0 คือไม่จำกัด, 0-1000)", default="0"))
-    limit_ip = int(Prompt.ask("[bold cyan]👥 จำนวน IP ที่ต้องการให้เชื่อมต่อ (1-20)", default="1"))
+    # เพิ่มเมนูเลือกเครือข่ายก่อน
+    console.print("\n[bold yellow]กรุณาเลือกเครือข่ายที่ต้องการสร้างโค้ด:\n")
+    console.print("  [bold green]1️⃣ ทรูโนโปร[/bold green]")
+    console.print("  [bold blue]2️⃣ ทรูโปรเฟส[/bold blue]")
+    console.print("  [bold red]3️⃣ AIS[/bold red]")
 
-    # ตรวจสอบว่าจำนวน IP อยู่ในช่วงที่กำหนด
-    if limit_ip < 1 or limit_ip > 20:
-        console.print("[bold red]จำนวน IP ต้องอยู่ในช่วง 1-20")
-        console.input("[bold green]กด Enter เพื่อกลับสู่เมนูหลัก...")
-        return
+    carrier_choice = Prompt.ask("\n[bold cyan]🔢 กรุณาพิมพ์หมายเลขที่ต้องการใช้ (1-3)", choices=["1", "2", "3"])
+
+    # กำหนด id ตามเครือข่ายที่เลือก
+    carrier_id_mapping = {
+        "1": 5,  # ทรูโนโปร
+        "2": 3,  # ทรูโปรเฟส
+        "3": 7   # AIS
+    }
+
+    selected_id = carrier_id_mapping.get(carrier_choice)
+
+    console.print("[bold yellow]\nกรุณากรอกข้อมูลสำหรับสร้างโค้ด\n")
+
+    # รับชื่อโค้ด
+    code_name = Prompt.ask("[bold cyan]📝 ตั้งชื่อโค้ดของคุณ")
+
+    # รับจำนวนวันที่ต้องการ (1-30)
+    num_days = get_validated_input(
+        "[bold cyan]📅 จำนวนวันที่ต้องการ (1-30)",
+        default="1",
+        validation_func=lambda x: x.isdigit() and 1 <= int(x) <= 30,
+        error_message="กรุณากรอกเลขระหว่าง 1-30"
+    )
+    num_days = int(num_days)
+
+    # รับจำนวน GB ที่ต้องการ (0-1000)
+    gb_amount = get_validated_input(
+        "[bold cyan]💾 จำนวน GB ที่ต้องการ (0 คือไม่จำกัด, 0-1000)",
+        default="0",
+        validation_func=lambda x: x.isdigit() and 0 <= int(x) <= 1000,
+        error_message="กรุณากรอกเลขระหว่าง 0-1000"
+    )
+    gb_amount = int(gb_amount)
+
+    # รับจำนวน IP ที่ต้องการให้เชื่อมต่อ (1-20)
+    limit_ip = get_validated_input(
+        "[bold cyan]👥 จำนวน IP ที่ต้องการให้เชื่อมต่อ (1-20)",
+        default="1",
+        validation_func=lambda x: x.isdigit() and 1 <= int(x) <= 20,
+        error_message="กรุณากรอกเลขระหว่าง 1-20"
+    )
+    limit_ip = int(limit_ip)
 
     client_id = str(uuid.uuid4())
 
@@ -111,7 +159,7 @@ def create_code(session, base_url, username, password):
     settings_str = json.dumps(client_info)
 
     payload = {
-        "id": 5,  # คุณสามารถปรับแก้ไข ID ได้ตามต้องการ
+        "id": selected_id,  # ใช้ id ตามเครือข่ายที่เลือก
         "settings": settings_str
     }
 
@@ -148,7 +196,7 @@ def create_code(session, base_url, username, password):
         if result.get("success"):
             console.print("[bold green]✅ สร้างโค้ดสำเร็จ\n")
             # สร้าง VLESS URL
-            host_value = base_url.replace('http://', '').split(':')[0]
+            host_value = base_url.replace('http://', '').replace('https://', '').split(':')[0]
             vless_url = f"vless://{client_id}@{host_value}:2052?path=%2F&security=none&encryption=none&host={host_value}&type=ws#{code_name}"
             console.print(Panel(f"[bold yellow]{vless_url}", title="[bold cyan]🔑 โค้ดของคุณคือ", style="bold green"))
         else:
@@ -161,6 +209,7 @@ def create_code(session, base_url, username, password):
     console.input("[bold green]กด Enter เพื่อกลับสู่เมนูหลัก...")
 
 def view_online_users(session, base_url, username, password):
+    """ฟังก์ชันสำหรับดูจำนวนผู้ใช้งานออนไลน์"""
     clear_screen()
     console.print(Panel("""
 [bold cyan]
@@ -169,7 +218,7 @@ def view_online_users(session, base_url, username, password):
    \ \ / / _ \ '__/ __| |/ _ \ | __| '_ \ / _ \    
     \ V /  __/ |  \__ \ |  __/ | |_| | | |  __/    
      \_/ \___|_|  |___/_|\___|  \__|_| |_|\___|    
-                                                      
+                                                  
 [/bold cyan]
     """, title="[bold yellow]ดูจำนวนคนใช้งานออนไลน์ทั้งหมด", style="bold blue", padding=1))
 
@@ -237,6 +286,7 @@ def view_online_users(session, base_url, username, password):
     console.input("[bold green]กด Enter เพื่อกลับสู่เมนูหลัก...")
 
 def print_menu():
+    """ฟังก์ชันสำหรับแสดงเมนูหลัก"""
     clear_screen()
     console.print(Panel("""
 [bold cyan]
