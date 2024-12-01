@@ -20,7 +20,7 @@ console = Console()
 
 # ข้อมูลโปรแกรม
 PROGRAM_NAME = "EXPODOM.Q1"
-VERSION = "0.2"
+VERSION = "0.3"
 CREATION_DATE = "1 มกราคม 2566"  # ปรับวันที่ให้ถูกต้องตามต้องการ
 
 CONFIG_FILE = "ข้อมูลล็อกอิน.json"
@@ -452,6 +452,21 @@ def update_script():
 
         latest_version = version_match.group(1)
 
+        # ใช้ regex เพื่อดึง CHANGELOG จากสคริปต์ล่าสุด
+        changelog_match = re.search(r'CHANGELOG\s*=\s*({.*?})', latest_script, re.DOTALL)
+        if not changelog_match:
+            console.print("[bold red]❌ ไม่พบ CHANGELOG ในสคริปต์ล่าสุด[/bold red]")
+            console.input("[bold green]กด Enter เพื่อกลับสู่เมนูหลัก...[/bold green]")
+            return
+
+        changelog_json = changelog_match.group(1)
+        try:
+            changelog = json.loads(changelog_json)
+        except json.JSONDecodeError:
+            console.print("[bold red]❌ การจัดรูปแบบ CHANGELOG ผิดพลาด[/bold red]")
+            console.input("[bold green]กด Enter เพื่อกลับสู่เมนูหลัก...[/bold green]")
+            return
+
         # แสดงเวอร์ชันปัจจุบัน
         console.print(f"[bold yellow]{PROGRAM_NAME} - เวอร์ชั่น {VERSION}[/bold yellow]")
 
@@ -460,7 +475,7 @@ def update_script():
             update_choice = Prompt.ask("[bold cyan]ต้องการอัพเดตโปรแกรมใช่หรือไม่? (y/n)", choices=["y", "n"], default="n")
             if update_choice.lower() == 'y':
                 console.print("[bold green]🔄 กำลังอัพเดทโปรแกรม...[/bold green]")
-                # แสดงแอนิเมชันกำลังอัพเดทเป็นเวลา 23 วินาที
+                # แสดงแอนิเมชันกำลังอัพเดตเป็นเวลา 23 วินาที
                 with Progress(
                     SpinnerColumn(style="bold green"),
                     TextColumn("[progress.description]{task.description}"),
@@ -469,7 +484,7 @@ def update_script():
                     TimeRemainingColumn(),
                     transient=True,
                 ) as progress:
-                    task = progress.add_task("[bold blue]กำลังอัพเดทโปรแกรม...[/bold blue]", total=23)
+                    task = progress.add_task("[bold blue]กำลังอัพเดตโปรแกรม...", total=23)
                     for _ in range(23):
                         time.sleep(1)
                         progress.update(task, advance=1)
@@ -490,6 +505,12 @@ def update_script():
         console.print(f"[bold red]❌ เกิดข้อผิดพลาดขณะตรวจสอบเวอร์ชัน: {e}[/bold red]")
     except Exception as ex:
         console.print(f"[bold red]❌ เกิดข้อผิดพลาด: {ex}[/bold red]")
+
+    # แสดงรายละเอียดของการเปลี่ยนแปลงในเวอร์ชันล่าสุด
+    if latest_version > VERSION:
+        console.print(f"\n[bold yellow]🚀 เวอร์ชั่นใหม่ {latest_version} มีการเปลี่ยนแปลงดังนี้:[/bold yellow]")
+        for change in changelog.get(latest_version, []):
+            console.print(f"• {change}")
 
     console.input("[bold green]กด Enter เพื่อกลับสู่เมนูหลัก...[/bold green]")
 
